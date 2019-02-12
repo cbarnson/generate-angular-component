@@ -75,6 +75,25 @@ def ng_component_ts_template(selector, template_url, classname):
         }
     """ % (selector, template_url, classname))
 
+def ng_component_ts_template_inline(selector, classname):
+    # E.g. Input: app-my-draft-view, my-draft-view.component.html, MyDraftViewComponent
+    return textwrap.dedent("""\
+        import { Component, OnInit } from "@angular/core";
+
+        @Component({
+          selector: "%s",
+          template: `
+          <p>%s</p>
+          `
+        })
+        export class %s implements OnInit {
+
+          constructor() {}
+
+          ngOnInit(): void {}
+        }
+    """ % (selector, selector, classname))
+
 
 class KebabCaseConverter:
     _precompile = False
@@ -111,7 +130,7 @@ class NgKebabConverter(KebabCaseConverter):
 
     # E.g. DocViewer --> app-doc-viewer
     def selector(self, input_string):
-        return "app-" + self.convert_to_kebab(input_string) + "-component"
+        return "app-" + self.convert_to_kebab(input_string)
 
     # E.g. DocViewer --> doc-viewer.component.html
     def template_file_name(self, input_string):
@@ -142,7 +161,7 @@ def component_class_name(input_string):
     return input_string if (str(input_string).endswith("Component")) else input_string + "Component"
 
 
-def generate(converter, line, safe_mode = False):
+def generate(converter, line, safe_mode = False, inline_mode = False):
     # Auto detect a different "mode", where input is just case
     # insensitive but words are delimited by spaces; build the string to
     # CamelCase style, then proceed as normal
@@ -206,16 +225,23 @@ def generate(converter, line, safe_mode = False):
         os.mkdir(destination)
         assert(os.path.exists(destination))
 
-        # Create .component.html
-        content_html = ng_component_html_template()
-        with open(template, "w") as text_file:
-            print(f"{content_html}", file=text_file)
-
         # Create .component.ts
-        content_ts = ng_component_ts_template(
-            selector, template_filename, classname)
-        with open(component, "w") as text_file:
-            print(f"{content_ts}", file=text_file)
+        if (inline_mode):
+            content_ts = ng_component_ts_template_inline(
+                selector, classname)
+            with open(component, "w") as text_file:
+                print(f"{content_ts}", file=text_file)
+        else:
+            content_ts = ng_component_ts_template(
+                selector, template_filename, classname)
+            with open(component, "w") as text_file:
+                print(f"{content_ts}", file=text_file)
+
+        # Create .component.html
+        if (not inline_mode):
+            content_html = ng_component_html_template()
+            with open(template, "w") as text_file:
+                print(f"{content_html}", file=text_file)
 
         # Create .spec.ts
         content_spec = ng_component_spec_template(
@@ -244,7 +270,8 @@ def generate(converter, line, safe_mode = False):
 
         # Checks
         assert(os.path.exists(os.path.join(destination, component_filename)))
-        assert(os.path.exists(os.path.join(destination, template_filename)))
+        if (not inline_mode):
+            assert(os.path.exists(os.path.join(destination, template_filename)))
         assert(os.path.exists(os.path.join(destination, spec_filename)))
         print("Files successfully created.")
         print("All done!")
@@ -273,6 +300,7 @@ def dprint(s):
 def main():
     converter = NgKebabConverter()
     safe_mode = False
+    inline_mode = False
 
     # If run with args, use the arg list as a single line of input
     # E.g. gen.py hello world
@@ -290,6 +318,10 @@ def main():
             dprint(f"After --dry-run option removed: {raw_args}")
             safe_mode = True
 
+        if ("--inline" in raw_args):
+            raw_args.remove("--inline")
+            dprint(f"After --inline option removed: {raw_args}")
+            inline_mode = True
 
         # Post-option removal, if still have args, run once with them, else move to the general loop below
         dprint(f"len(raw_args) : {len(raw_args)}")
@@ -298,8 +330,9 @@ def main():
             args = " ".join(raw_args)
             dprint(f"line : {args}")
             try:
-                dprint(f"safe_mode : {safe_mode}")
-                generate(converter, args, safe_mode)
+                dprint(f"safe_mode   : {safe_mode}")
+                dprint(f"inline_mode : {inline_mode}")
+                generate(converter, args, safe_mode, inline_mode)
             except Exception:
                 exit(3)
             return
@@ -313,7 +346,7 @@ def main():
                 break
 
             print("line : %s" % (line))
-            generate(converter, line, safe_mode)
+            generate(converter, line, safe_mode, False)
 
         except EOFError:
             print("ERROR: Must exit...")
