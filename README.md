@@ -1,4 +1,10 @@
-# Instructions
+# Generate Angular Component CLI Tool
+
+---
+> THIS REPO IS ARCHIVED AS OF DEC 2024
+---
+
+## Instructions
 
 1. Put `gen.py` script somewhere on your filesystem, doesn't need to be in
    `PATH`, but you'll need to get the full path to wherever you put it and
